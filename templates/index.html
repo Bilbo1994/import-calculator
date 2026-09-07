@@ -5,6 +5,10 @@
     <!-- Ce meta tag est ce qui rend la page utilisable sur smartphone -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Calculateur Import Véhicule Chine</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <meta name="theme-color" content="#2563eb">
     <style>
         body {
             font-family: -apple-system, Arial, sans-serif;
@@ -91,7 +95,7 @@
 </head>
 <body>
     <div class="card">
-        <h1>🚗 Calculateur Import Véhicule</h1>
+        <h1>🚗 Calculateur Import Véhicule Chine</h1>
         <p class="subtitle">Chine → Algérie — estimation du coût total</p>
 
         <form method="POST">
@@ -138,5 +142,12 @@
         </div>
         {% endif %}
     </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+            });
+        }
+    </script>
 </body>
 </html>
