@@ -50,7 +50,12 @@ def index():
 
     # render_template va chercher templates/index.html et lui transmet
     # les variables "resultat" et "erreur" pour qu'il les affiche.
-    return render_template('index.html', resultat=resultat, erreur=erreur)
+    return render_template('index.html', resultat=resultat, erreur=erreur, active='calc')
+
+
+@app.route('/guide')
+def guide():
+    return render_template('guide.html', active='guide')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <!-- Ce meta tag est ce qui rend la page utilisable sur smartphone -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Calculateur Import Véhicule Chine{% endblock %}</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <meta name="theme-color" content="#0b1220">
+    <style>
+        :root {
+            --bg: #0b1220;
+            --bg-glow-a: #1d2a52;
+            --bg-glow-b: #0d3b3a;
+            --card: #141d33;
+            --card-border: #253253;
+            --text: #eef1f8;
+            --text-dim: #93a0c2;
+            --accent: #3b82f6;
+            --accent-2: #22d3ee;
+            --danger-bg: #3a1420;
+            --danger-text: #fca5b5;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+            background:
+                radial-gradient(700px circle at 15% -10%, var(--bg-glow-a), transparent 60%),
+                radial-gradient(600px circle at 100% 10%, var(--bg-glow-b), transparent 55%),
+                var(--bg);
+            background-attachment: fixed;
+            margin: 0;
+            padding: 24px 16px 40px;
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .shell {
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .brand .logo {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .brand span {
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: 0.02em;
+        }
+        .tabs {
+            display: flex;
+            gap: 6px;
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            padding: 5px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px 8px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-dim);
+            font-size: 0.88rem;
+            font-weight: 600;
+            transition: color 0.15s ease;
+        }
+        .tab.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #08111f;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+        }
+        h1 {
+            font-size: 1.25rem;
+            margin: 0 0 4px;
+        }
+        p.subtitle {
+            color: var(--text-dim);
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 0.88rem;
+        }
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+        input {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            font-size: 1rem;
+            background: #0e1830;
+            color: var(--text);
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        button {
+            width: 100%;
+            margin-top: 22px;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #08111f;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        button:active {
+            filter: brightness(0.92);
+        }
+        .resultat {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--card-border);
+        }
+        .ligne {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 0;
+            font-size: 0.95rem;
+            color: var(--text-dim);
+        }
+        .ligne.total {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text);
+            border-top: 1px solid var(--card-border);
+            margin-top: 8px;
+            padding-top: 12px;
+        }
+        .erreur {
+            margin-top: 16px;
+            color: var(--danger-text);
+            background: var(--danger-bg);
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+        }
+        .guide h2 {
+            font-size: 1rem;
+            margin: 22px 0 8px;
+            color: var(--accent-2);
+        }
+        .guide h2:first-child {
+            margin-top: 0;
+        }
+        .guide p, .guide li {
+            font-size: 0.92rem;
+            line-height: 1.55;
+            color: var(--text-dim);
+        }
+        .guide ul {
+            margin: 6px 0;
+            padding-left: 20px;
+        }
+        .guide .note {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 10px;
+            background: #0e1830;
+            border: 1px solid var(--card-border);
+            font-size: 0.82rem;
+            color: var(--text-dim);
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="shell">
+        <div class="brand">
+            <div class="logo">🚗</div>
+            <span>Import Véhicule Chine → Algérie</span>
+        </div>
+        <nav class="tabs">
+            <a href="{{ url_for('index') }}" class="tab {{ 'active' if active == 'calc' else '' }}">🧮 Calculateur</a>
+            <a href="{{ url_for('guide') }}" class="tab {{ 'active' if active == 'guide' else '' }}">📘 Guide import</a>
+        </nav>
+        <div class="card">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+            });
+        }
+    </script>
+</body>
+</html>
