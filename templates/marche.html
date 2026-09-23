@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Marché — Import Véhicule Chine{% endblock %}
+{% block shell_class %}wide{% endblock %}
+
+{% block head %}
+<style>
+    .market-section {
+        margin-bottom: 28px;
+        padding-top: 24px;
+    }
+    .market-section:first-of-type {
+        padding-top: 0;
+    }
+    .market-section + .market-section {
+        border-top: 1px solid var(--card-border);
+    }
+    .market-section h2 {
+        font-size: 1rem;
+        margin: 0 0 4px;
+        color: var(--accent-2);
+    }
+    .market-section p.desc {
+        margin: 0 0 14px;
+        font-size: 0.85rem;
+        color: var(--text-dim);
+    }
+    .stat-tile {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 10px;
+        background: #0e1830;
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+    }
+    .stat-tile .value {
+        font-size: 1.6rem;
+        font-weight: 700;
+    }
+    .stat-tile .label {
+        font-size: 0.78rem;
+        color: var(--text-dim);
+    }
+    .stat-tile .date {
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+    }
+    .chart-box {
+        position: relative;
+        height: 220px;
+        margin-bottom: 4px;
+    }
+    .chart-empty {
+        font-size: 0.85rem;
+        color: var(--text-dim);
+        padding: 10px 0 4px;
+    }
+    .inline-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+        align-items: end;
+    }
+    .inline-form .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .inline-form label {
+        margin: 0;
+        font-size: 0.75rem;
+    }
+    .inline-form input {
+        padding: 8px 10px;
+        font-size: 0.9rem;
+        width: auto;
+    }
+    .inline-form input[type="text"] { min-width: 170px; }
+    .inline-form input[type="number"] { width: 110px; }
+    .inline-form input[type="date"] { width: 145px; }
+    .inline-form button {
+        width: auto;
+        margin-top: 0;
+        padding: 9px 18px;
+        font-size: 0.85rem;
+    }
+    .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 14px;
+    }
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--card-border);
+        background: #0e1830;
+        color: var(--text-dim);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .pill .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .pill.active {
+        background: var(--card);
+        border-color: currentColor;
+        color: var(--text);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <h1>Marché</h1>
+    <p class="subtitle">Change, fret et prix véhicules — les indicateurs qui bougent</p>
+
+    <div class="market-section">
+        <h2>💶 EUR / USD</h2>
+
+        {% if eur_usd.actuel %}
+        <div class="stat-tile">
+            <span class="value">1 € = {{ "%.4f"|format(eur_usd.actuel.taux) }} $</span>
+            <span class="label">taux de référence BCE</span>
+            <span class="date">{{ eur_usd.actuel.date }}</span>
+        </div>
+        {% else %}
+        <p class="chart-empty">Taux indisponible pour le moment (API injoignable) — réessaie en rechargeant la page.</p>
+        {% endif %}
+
+        {% if eur_usd.historique|length > 1 %}
+        <div class="chart-box"><canvas id="chart-eurusd"></canvas></div>
+        {% endif %}
+    </div>
+
+    <div class="market-section">
+        <h2>🚢 Fret maritime Chine → Algérie (USD)</h2>
+        <p class="desc">Pas d'indice public pour cette route précise — ajoute toi-même les prix que tu trouves, pour suivre la tendance.</p>
+
+        {% if fret|length > 0 %}
+        <div class="chart-box"><canvas id="chart-fret"></canvas></div>
+        {% else %}
+        <p class="chart-empty">Aucune donnée pour l'instant — ajoute ton premier prix ci-dessous.</p>
+        {% endif %}
+
+        <form class="inline-form" method="POST" action="{{ url_for('ajouter_fret') }}">
+            <div class="field">
+                <label for="fret_date">Date</label>
+                <input type="date" name="date" id="fret_date" value="{{ aujourdhui }}">
+            </div>
+            <div class="field">
+                <label for="fret_prix">Prix (USD)</label>
+                <input type="number" step="0.01" name="prix_usd" id="fret_prix" required>
+            </div>
+            <div class="field">
+                <label for="fret_note">Note (optionnel)</label>
+                <input type="text" name="note" id="fret_note" placeholder="ex: conteneur 40 pieds">
+            </div>
+            <button type="submit">Ajouter</button>
+        </form>
+    </div>
+
+    <div class="market-section">
+        <h2>🚗 Comparatif prix véhicules (DZD)</h2>
+        <p class="desc">Ajoute un prix vu sur Ouedkniss/Facebook pour un modèle — clique sur un modèle pour l'isoler, ou "Tous" pour comparer.</p>
+
+        {% if vehicules|length > 0 %}
+        <div class="pill-row" id="pill-row"></div>
+        <div class="chart-box"><canvas id="chart-vehicules"></canvas></div>
+        {% else %}
+        <p class="chart-empty">Aucun modèle suivi pour l'instant — ajoute ton premier prix ci-dessous (ex: "Geely Coolray (Auto)").</p>
+        {% endif %}
+
+        <form class="inline-form" method="POST" action="{{ url_for('ajouter_vehicule') }}">
+            <div class="field">
+                <label for="veh_modele">Modèle</label>
+                <input type="text" name="modele" id="veh_modele" placeholder="ex: Geely Coolray (Auto)" required>
+            </div>
+            <div class="field">
+                <label for="veh_date">Date</label>
+                <input type="date" name="date" id="veh_date" value="{{ aujourdhui }}">
+            </div>
+            <div class="field">
+                <label for="veh_prix">Prix (DZD)</label>
+                <input type="number" step="1" name="prix_dzd" id="veh_prix" required>
+            </div>
+            <button type="submit">Ajouter</button>
+        </form>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<script>
+(() => {
+    // Palette catégorielle validée (ordre fixe — jamais réassignée par filtre/tri)
+    const PALETTE = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+    const TEXT = '#eef1f8';
+    const TEXT_DIM = '#93a0c2';
+    const GRID = '#253253';
+
+    Chart.defaults.font.family = "-apple-system, 'Segoe UI', Arial, sans-serif";
+    Chart.defaults.color = TEXT_DIM;
+
+    function baseLineOptions(tooltipFormatter) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0e1830',
+                    borderColor: GRID,
+                    borderWidth: 1,
+                    titleColor: TEXT,
+                    bodyColor: TEXT,
+                    padding: 10,
+                    callbacks: { label: tooltipFormatter },
+                },
+            },
+            scales: {
+                x: { grid: { color: GRID }, ticks: { color: TEXT_DIM, maxTicksLimit: 8 } },
+                y: { grid: { color: GRID }, ticks: { color: TEXT_DIM } },
+            },
+        };
+    }
+
+    const eurUsdCanvas = document.getElementById('chart-eurusd');
+    if (eurUsdCanvas) {
+        const historique = {{ eur_usd.historique | tojson }};
+        new Chart(eurUsdCanvas, {
+            type: 'line',
+            data: {
+                labels: historique.map(p => p.date),
+                datasets: [{
+                    data: historique.map(p => p.taux),
+                    borderColor: PALETTE[0],
+                    backgroundColor: PALETTE[0],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    tension: 0.15,
+                }],
+            },
+            options: baseLineOptions(ctx => `1 € = ${ctx.parsed.y.toFixed(4)} $`),
+        });
+    }
+
+    const fretCanvas = document.getElementById('chart-fret');
+    if (fretCanvas) {
+        const fret = {{ fret | tojson }};
+        new Chart(fretCanvas, {
+            type: 'line',
+            data: {
+                labels: fret.map(p => p.date),
+                datasets: [{
+                    data: fret.map(p => p.prix_usd),
+                    borderColor: PALETTE[0],
+                    backgroundColor: PALETTE[0],
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                    tension: 0.15,
+                }],
+            },
+            options: baseLineOptions(ctx => `${ctx.parsed.y.toLocaleString('fr-FR')} $`),
+        });
+    }
+
+    const vehCanvas = document.getElementById('chart-vehicules');
+    if (vehCanvas) {
+        const vehicules = {{ vehicules | tojson }};
+        const modeles = Object.keys(vehicules);
+        const couleurs = {};
+        modeles.forEach((m, i) => { couleurs[m] = PALETTE[i % PALETTE.length]; });
+
+        const datasets = modeles.map(modele => ({
+            label: modele,
+            data: vehicules[modele].map(p => ({ x: p.date, y: p.prix })),
+            borderColor: couleurs[modele],
+            backgroundColor: couleurs[modele],
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            tension: 0.15,
+        }));
+
+        const chart = new Chart(vehCanvas, {
+            type: 'line',
+            data: { datasets },
+            options: {
+                ...baseLineOptions(ctx => `${ctx.dataset.label} : ${ctx.parsed.y.toLocaleString('fr-FR')} DZD`),
+                parsing: false,
+                scales: {
+                    x: { type: 'category', grid: { color: GRID }, ticks: { color: TEXT_DIM, maxTicksLimit: 8 } },
+                    y: { grid: { color: GRID }, ticks: { color: TEXT_DIM } },
+                },
+            },
+        });
+
+        // Filtre "pills" : un modèle à la fois, ou "Tous" — la couleur ne change jamais.
+        const pillRow = document.getElementById('pill-row');
+        let selection = 'Tous';
+
+        function appliquerSelection() {
+            chart.data.datasets.forEach((ds, i) => {
+                ds.hidden = selection !== 'Tous' && modeles[i] !== selection;
+            });
+            chart.update();
+            [...pillRow.children].forEach(pill => {
+                pill.classList.toggle('active', pill.dataset.value === selection);
+            });
+        }
+
+        function creerPill(valeur, couleur) {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'pill';
+            pill.dataset.value = valeur;
+            pill.style.color = couleur || TEXT;
+            pill.innerHTML = (couleur ? `<span class="dot" style="background:${couleur}"></span>` : '') + valeur;
+            pill.addEventListener('click', () => { selection = valeur; appliquerSelection(); });
+            return pill;
+        }
+
+        pillRow.appendChild(creerPill('Tous', null));
+        modeles.forEach(m => pillRow.appendChild(creerPill(m, couleurs[m])));
+        appliquerSelection();
+    }
+})();
+</script>
+{% endblock %}

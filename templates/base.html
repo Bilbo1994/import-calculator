@@ -40,6 +40,9 @@
             max-width: 520px;
             margin: 0 auto;
         }
+        .shell.wide {
+            max-width: 760px;
+        }
         .brand {
             display: flex;
             align-items: center;
@@ -197,7 +200,7 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-    <div class="shell">
+    <div class="shell {% block shell_class %}{% endblock %}">
         <div class="brand">
             <div class="logo">🚗</div>
             <span>Import Véhicule Chine → Algérie</span>
@@ -205,6 +208,7 @@
         <nav class="tabs">
             <a href="{{ url_for('index') }}" class="tab {{ 'active' if active == 'calc' else '' }}">🧮 Calculateur</a>
             <a href="{{ url_for('guide') }}" class="tab {{ 'active' if active == 'guide' else '' }}">📘 Guide import</a>
+            <a href="{{ url_for('marche') }}" class="tab {{ 'active' if active == 'marche' else '' }}">📈 Marché</a>
         </nav>
         <div class="card">
             {% block content %}{% endblock %}
@@ -217,5 +221,6 @@
             });
         }
     </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

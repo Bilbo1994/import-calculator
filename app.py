@@ -7,11 +7,55 @@ Petite application Flask pour s'entraîner :
 - un template Jinja (index.html) qui affiche le formulaire + le résultat
 """
 
-from flask import Flask, render_template, request
+from datetime import date, timedelta
+
+import requests
+from flask import Flask, redirect, render_template, request, url_for
+
+import db
 
 # On crée l'objet application. __name__ dit à Flask où se trouve ce fichier,
 # pour qu'il sache où chercher le dossier "templates".
 app = Flask(__name__)
+db.init_db()
+
+FRANKFURTER_URL = "https://api.frankfurter.dev/v1"
+
+
+def get_eur_usd():
+    """Récupère le taux EUR/USD actuel + historique 90 jours (API gratuite, sans clé)."""
+    resultat = {'actuel': None, 'historique': []}
+
+    try:
+        r = requests.get(
+            f"{FRANKFURTER_URL}/latest",
+            params={'base': 'EUR', 'symbols': 'USD'},
+            timeout=5,
+        )
+        r.raise_for_status()
+        data = r.json()
+        resultat['actuel'] = {'taux': data['rates']['USD'], 'date': data['date']}
+    except (requests.RequestException, KeyError, ValueError):
+        pass
+
+    try:
+        fin = date.today()
+        debut = fin - timedelta(days=90)
+        r = requests.get(
+            f"{FRANKFURTER_URL}/{debut.isoformat()}..{fin.isoformat()}",
+            params={'base': 'EUR', 'symbols': 'USD'},
+            timeout=5,
+        )
+        r.raise_for_status()
+        data = r.json()
+        resultat['historique'] = [
+            {'date': jour, 'taux': valeurs['USD']}
+            for jour, valeurs in sorted(data['rates'].items())
+        ]
+    except (requests.RequestException, KeyError, ValueError):
+        pass
+
+    return resultat
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -56,6 +100,54 @@ def index():
 @app.route('/guide')
 def guide():
     return render_template('guide.html', active='guide')
+
+
+@app.route('/marche')
+def marche():
+    eur_usd = get_eur_usd()
+    fret = db.lister_fret()
+
+    # Regroupe les prix véhicules par modèle, dans l'ordre de première apparition
+    # (important pour que la couleur d'un modèle reste stable dans le graphe).
+    vehicules = {}
+    for ligne in db.lister_vehicules():
+        vehicules.setdefault(ligne['modele'], []).append(
+            {'date': ligne['date'], 'prix': ligne['prix_dzd']}
+        )
+
+    return render_template(
+        'marche.html',
+        active='marche',
+        eur_usd=eur_usd,
+        fret=fret,
+        vehicules=vehicules,
+        aujourdhui=date.today().isoformat(),
+    )
+
+
+@app.route('/marche/fret', methods=['POST'])
+def ajouter_fret():
+    try:
+        prix = float(request.form['prix_usd'])
+        date_saisie = request.form.get('date') or date.today().isoformat()
+        note = request.form.get('note', '').strip()
+        db.ajouter_fret(date_saisie, prix, note)
+    except (ValueError, KeyError):
+        pass
+    return redirect(url_for('marche'))
+
+
+@app.route('/marche/vehicule', methods=['POST'])
+def ajouter_vehicule():
+    try:
+        modele = request.form['modele'].strip()
+        prix = float(request.form['prix_dzd'])
+        date_saisie = request.form.get('date') or date.today().isoformat()
+        if modele:
+            db.ajouter_vehicule(date_saisie, modele, prix)
+    except (ValueError, KeyError):
+        pass
+    return redirect(url_for('marche'))
 
 
 if __name__ == '__main__':
