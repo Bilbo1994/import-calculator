@@ -22,6 +22,21 @@ db.init_db()
 FRANKFURTER_URL = "https://api.frankfurter.dev/v1"
 
 
+def calc_tendance(valeurs):
+    """Compare les deux dernières valeurs d'une série pour dire si ça monte ou descend."""
+    if len(valeurs) < 2:
+        return None
+    precedent, dernier = valeurs[-2], valeurs[-1]
+    diff = dernier - precedent
+    if diff == 0:
+        return {'sens': 'stable', 'diff': 0, 'pct': 0}
+    return {
+        'sens': 'hausse' if diff > 0 else 'baisse',
+        'diff': abs(diff),
+        'pct': abs(diff / precedent * 100) if precedent else None,
+    }
+
+
 def get_eur_usd():
     """Récupère le taux EUR/USD actuel + historique 90 jours (API gratuite, sans clé)."""
     resultat = {'actuel': None, 'historique': []}
@@ -55,6 +70,7 @@ def get_eur_usd():
     except (requests.RequestException, KeyError, ValueError):
         pass
 
+    resultat['tendance'] = calc_tendance([p['taux'] for p in resultat['historique']])
     return resultat
 
 
@@ -106,6 +122,7 @@ def guide():
 def marche():
     eur_usd = get_eur_usd()
     fret = db.lister_fret()
+    tendance_fret = calc_tendance([f['prix_usd'] for f in fret])
 
     # Regroupe les prix véhicules par modèle, dans l'ordre de première apparition
     # (important pour que la couleur d'un modèle reste stable dans le graphe).
@@ -120,6 +137,7 @@ def marche():
         active='marche',
         eur_usd=eur_usd,
         fret=fret,
+        tendance_fret=tendance_fret,
         vehicules=vehicules,
         aujourdhui=date.today().isoformat(),
     )

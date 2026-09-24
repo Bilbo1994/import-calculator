@@ -119,15 +119,59 @@
         border-color: currentColor;
         color: var(--text);
     }
+    .section-head {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 4px;
+    }
+    .section-head h2 {
+        margin: 0;
+    }
+    .trend-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
+    .trend-badge.hausse {
+        color: #2fce2f;
+        background: rgba(12, 163, 12, 0.16);
+    }
+    .trend-badge.baisse {
+        color: #ff8080;
+        background: rgba(208, 59, 59, 0.18);
+    }
+    .trend-badge.stable {
+        color: var(--text-dim);
+        background: rgba(147, 160, 194, 0.12);
+    }
 </style>
 {% endblock %}
+
+{% macro badge(t) %}
+{% if t %}
+<span class="trend-badge {{ t.sens }}">
+    {%- if t.sens == 'hausse' -%}▲{%- elif t.sens == 'baisse' -%}▼{%- else -%}—{%- endif -%}
+    {{ ' ' }}{{ t.sens }}{% if t.pct is not none %} ({{ "%.2f"|format(t.pct) }}%){% endif %}
+</span>
+{% endif %}
+{% endmacro %}
 
 {% block content %}
     <h1>Marché</h1>
     <p class="subtitle">Change, fret et prix véhicules — les indicateurs qui bougent</p>
 
     <div class="market-section">
-        <h2>💶 EUR / USD</h2>
+        <div class="section-head">
+            <h2>💶 EUR / USD</h2>
+            {{ badge(eur_usd.tendance) }}
+        </div>
 
         {% if eur_usd.actuel %}
         <div class="stat-tile">
@@ -145,7 +189,10 @@
     </div>
 
     <div class="market-section">
-        <h2>🚢 Fret maritime Chine → Algérie (USD)</h2>
+        <div class="section-head">
+            <h2>🚢 Fret maritime Chine → Algérie (USD)</h2>
+            {{ badge(tendance_fret) }}
+        </div>
         <p class="desc">Pas d'indice public pour cette route précise — ajoute toi-même les prix que tu trouves, pour suivre la tendance.</p>
 
         {% if fret|length > 0 %}
@@ -172,7 +219,10 @@
     </div>
 
     <div class="market-section">
-        <h2>🚗 Comparatif prix véhicules (DZD)</h2>
+        <div class="section-head">
+            <h2>🚗 Comparatif prix véhicules (DZD)</h2>
+            <span id="veh-trend-badge"></span>
+        </div>
         <p class="desc">Ajoute un prix vu sur Ouedkniss/Facebook pour un modèle — clique sur un modèle pour l'isoler, ou "Tous" pour comparer.</p>
 
         {% if vehicules|length > 0 %}
@@ -312,7 +362,28 @@
 
         // Filtre "pills" : un modèle à la fois, ou "Tous" — la couleur ne change jamais.
         const pillRow = document.getElementById('pill-row');
+        const trendBadge = document.getElementById('veh-trend-badge');
         let selection = 'Tous';
+
+        function calcTendance(valeurs) {
+            if (valeurs.length < 2) return null;
+            const precedent = valeurs[valeurs.length - 2];
+            const dernier = valeurs[valeurs.length - 1];
+            const diff = dernier - precedent;
+            if (diff === 0) return { sens: 'stable', pct: 0 };
+            return {
+                sens: diff > 0 ? 'hausse' : 'baisse',
+                pct: precedent ? Math.abs((diff / precedent) * 100) : null,
+            };
+        }
+
+        function afficherTendance(t) {
+            if (!t) { trendBadge.className = ''; trendBadge.innerHTML = ''; return; }
+            const fleche = t.sens === 'hausse' ? '▲' : (t.sens === 'baisse' ? '▼' : '—');
+            const pct = t.pct != null ? ` (${t.pct.toFixed(2)}%)` : '';
+            trendBadge.className = 'trend-badge ' + t.sens;
+            trendBadge.textContent = `${fleche} ${t.sens}${pct}`;
+        }
 
         function appliquerSelection() {
             chart.data.datasets.forEach((ds, i) => {
@@ -322,6 +393,7 @@
             [...pillRow.children].forEach(pill => {
                 pill.classList.toggle('active', pill.dataset.value === selection);
             });
+            afficherTendance(selection !== 'Tous' ? calcTendance(vehicules[selection].map(p => p.prix)) : null);
         }
 
         function creerPill(valeur, couleur) {
