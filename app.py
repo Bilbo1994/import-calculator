@@ -74,43 +74,83 @@ def get_eur_usd():
     return resultat
 
 
+def calculer_scenario(nom, taux_eur_usd, taux_eur_dzd, prix_usd, transport_usd,
+                      frais_douane, nombre):
+    """Coût d'un lot de voitures pour un taux euro->dollar donné."""
+    # Les deux taux sont en euro : 1 USD = (EUR->DZD) / (EUR->USD) dinars
+    taux_usd_dzd = taux_eur_dzd / taux_eur_usd
+
+    voitures_usd = prix_usd * nombre
+    total_usd = voitures_usd + transport_usd  # le conteneur est payé une seule fois
+    douane_totale = frais_douane * nombre  # frais saisis pour une seule voiture
+
+    sans_douane_dzd = total_usd * taux_usd_dzd
+    avec_douane_dzd = sans_douane_dzd + douane_totale
+    sans_douane_eur = total_usd / taux_eur_usd
+
+    return {
+        'nom': nom,
+        'taux_eur_usd': taux_eur_usd,
+        'taux_usd_dzd': taux_usd_dzd,
+        'voitures_dzd': voitures_usd * taux_usd_dzd,
+        'transport_dzd': transport_usd * taux_usd_dzd,
+        'douane_dzd': douane_totale,
+        'sans_douane_dzd': sans_douane_dzd,
+        'sans_douane_par_voiture_dzd': sans_douane_dzd / nombre,
+        'avec_douane_dzd': avec_douane_dzd,
+        'avec_douane_par_voiture_dzd': avec_douane_dzd / nombre,
+        'sans_douane_eur': sans_douane_eur,
+        'sans_douane_par_voiture_eur': sans_douane_eur / nombre,
+    }
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     resultat = None
     erreur = None
+    valeurs = request.form if request.method == 'POST' else {}
 
     if request.method == 'POST':
-        # request.form contient les valeurs envoyées par le formulaire HTML.
-        # On les récupère et on les convertit en nombres (float).
         try:
-            prix_fob = float(request.form['prix_fob'])
-            transport = float(request.form['transport'])
-            assurance = float(request.form.get('assurance') or 0)
-            taux_douane = float(request.form['taux_douane'])
-            taux_change = float(request.form['taux_change'])
+            prix_usd = float(request.form['prix_usd'])
+            transport_usd = float(request.form['transport_usd'])
+            taux_bon = float(request.form['taux_eur_usd_bon'])
+            taux_faible = float(request.form['taux_eur_usd_faible'])
+            taux_eur_dzd = float(request.form['taux_eur_dzd'])
+            frais_douane = float(request.form['frais_douane'])
+            nombre = int(request.form['nombre'])
 
-            # --- Le calcul métier ---
-            # Valeur CIF = Cost + Insurance + Freight (base classique en douane)
-            valeur_cif = prix_fob + transport + assurance
-
-            # Droits de douane calculés sur la valeur CIF
-            droits_douane = valeur_cif * taux_douane / 100
-
-            total_usd = valeur_cif + droits_douane
-            total_dzd = total_usd * taux_change
+            if nombre < 1 or min(taux_bon, taux_faible, taux_eur_dzd) <= 0:
+                raise ValueError
 
             resultat = {
-                'valeur_cif': round(valeur_cif, 2),
-                'droits_douane': round(droits_douane, 2),
-                'total_usd': round(total_usd, 2),
-                'total_dzd': round(total_dzd, 2),
+                'nombre': nombre,
+                'frais_douane_unitaire': frais_douane,
+                'scenarios': [
+                    calculer_scenario('Bon taux', taux_bon, taux_eur_dzd, prix_usd,
+                                      transport_usd, frais_douane, nombre),
+                    calculer_scenario('Taux faible', taux_faible, taux_eur_dzd, prix_usd,
+                                      transport_usd, frais_douane, nombre),
+                ],
             }
         except (ValueError, KeyError):
-            erreur = "Merci de remplir les champs obligatoires avec des nombres valides."
+            erreur = "Merci de remplir tous les champs avec des nombres valides (taux > 0, au moins 1 voiture)."
 
-    # render_template va chercher templates/index.html et lui transmet
-    # les variables "resultat" et "erreur" pour qu'il les affiche.
-    return render_template('index.html', resultat=resultat, erreur=erreur, active='calc')
+    return render_template(
+        'index.html', resultat=resultat, erreur=erreur, valeurs=valeurs, active='calc'
+    )
+
+
+@app.template_filter('ecart')
+def formater_ecart(valeur, decimales=0):
+    if round(valeur, decimales) == 0:
+        return "0"
+    return f"{valeur:+,.{decimales}f}".replace(",", " ")
+
+
+@app.template_filter('nombre')
+def formater_nombre(valeur, decimales=0):
+    return f"{valeur:,.{decimales}f}".replace(",", " ")
 
 
 @app.route('/guide')

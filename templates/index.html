@@ -1,24 +1,87 @@
 {% extends "base.html" %}
 
+{% block head %}
+<style>
+    .table-title {
+        font-size: 1rem;
+        margin: 22px 0 8px;
+        color: var(--accent-2);
+    }
+    .table-title:first-child { margin-top: 0; }
+    .table-wrap { overflow-x: auto; }
+    table.comparatif {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    table.comparatif th, table.comparatif td {
+        padding: 8px 6px;
+        border-bottom: 1px solid var(--card-border);
+        text-align: right;
+        color: var(--text-dim);
+    }
+    table.comparatif th:first-child, table.comparatif td:first-child { text-align: left; }
+    table.comparatif th {
+        color: var(--text);
+        font-size: 0.82rem;
+    }
+    table.comparatif th small {
+        display: block;
+        font-weight: 400;
+        color: var(--text-dim);
+        font-size: 0.72rem;
+    }
+    table.comparatif td.ecart { color: #ff8080; }
+    table.comparatif tr.total td { color: var(--text); font-weight: 700; }
+    table.comparatif tr.principal td {
+        color: var(--accent-2);
+        font-weight: 700;
+        background: #0e1830;
+    }
+    table.comparatif tr.section td {
+        text-align: left;
+        color: var(--text);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: none;
+        padding-top: 14px;
+    }
+    .hint {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        margin: 4px 0 0;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
     <h1>Calculateur Import Véhicule</h1>
-    <p class="subtitle">Chine → Algérie — estimation du coût total</p>
+    <p class="subtitle">Chine → Algérie — coût total et prix par voiture en dinars</p>
 
     <form method="POST">
-        <label for="prix_fob">Prix FOB du véhicule (USD)</label>
-        <input type="number" step="0.01" name="prix_fob" id="prix_fob" required>
+        <label for="prix_usd">Prix d'une voiture (USD)</label>
+        <input type="number" step="0.01" name="prix_usd" id="prix_usd" value="{{ valeurs.get('prix_usd', '') }}" required>
 
-        <label for="transport">Frais de transport maritime (USD)</label>
-        <input type="number" step="0.01" name="transport" id="transport" required>
+        <label for="nombre">Nombre de voitures</label>
+        <input type="number" step="1" min="1" name="nombre" id="nombre" value="{{ valeurs.get('nombre', 1) }}" required>
 
-        <label for="assurance">Assurance (USD, optionnel)</label>
-        <input type="number" step="0.01" name="assurance" id="assurance">
+        <label for="transport_usd">Transport conteneur maritime (USD, total)</label>
+        <input type="number" step="0.01" name="transport_usd" id="transport_usd" value="{{ valeurs.get('transport_usd', '') }}" required>
 
-        <label for="taux_douane">Taux de droits de douane (%)</label>
-        <input type="number" step="0.01" name="taux_douane" id="taux_douane" required>
+        <label for="taux_eur_usd_bon">Taux euro → dollar, bon taux (1 € = ? $)</label>
+        <input type="number" step="0.0001" name="taux_eur_usd_bon" id="taux_eur_usd_bon" value="{{ valeurs.get('taux_eur_usd_bon', '') }}" required>
 
-        <label for="taux_change">Taux de change (1 USD = ? DZD)</label>
-        <input type="number" step="0.01" name="taux_change" id="taux_change" required>
+        <label for="taux_eur_usd_faible">Taux euro → dollar, taux faible (1 € = ? $)</label>
+        <input type="number" step="0.0001" name="taux_eur_usd_faible" id="taux_eur_usd_faible" value="{{ valeurs.get('taux_eur_usd_faible', '') }}" required>
+
+        <label for="taux_eur_dzd">Taux euro → dinar, marché noir (1 € = ? DZD)</label>
+        <input type="number" step="0.01" name="taux_eur_dzd" id="taux_eur_dzd" value="{{ valeurs.get('taux_eur_dzd', '') }}" required>
+
+        <label for="frais_douane">Frais de douane pour une voiture (DZD)</label>
+        <input type="number" step="0.01" name="frais_douane" id="frais_douane" value="{{ valeurs.get('frais_douane', '') }}" required>
+        <p class="hint">Montant pour une seule voiture, en dinars : il est multiplié par le nombre de voitures.</p>
 
         <button type="submit">Calculer</button>
     </form>
@@ -28,22 +91,47 @@
     {% endif %}
 
     {% if resultat %}
+    {% set sc = resultat.scenarios %}
+    {% set n = resultat.nombre %}
     <div class="resultat">
-        <div class="ligne">
-            <span>Valeur CIF</span>
-            <span>{{ resultat.valeur_cif }} $</span>
+        <h2 class="table-title">Avec douane (DZD)</h2>
+        <div class="table-wrap">
+        <table class="comparatif">
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for x in sc %}<th>{{ x.nom }}<small>1 € = {{ x.taux_eur_usd | nombre(4) }} $</small></th>{% endfor %}<th>Écart<small>faible − bon</small></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Taux dollar déduit (1 $ = ? DZD)</td>{% for x in sc %}<td>{{ x.taux_usd_dzd | nombre(2) }}</td>{% endfor %}<td class="ecart">{{ (sc[1].taux_usd_dzd - sc[0].taux_usd_dzd) | ecart(2) }}</td></tr>
+                <tr><td>{{ n }} voiture{{ 's' if n > 1 }}</td>{% for x in sc %}<td>{{ x.voitures_dzd | nombre }}</td>{% endfor %}<td class="ecart">{{ (sc[1].voitures_dzd - sc[0].voitures_dzd) | ecart(0) }}</td></tr>
+                <tr><td>Transport conteneur</td>{% for x in sc %}<td>{{ x.transport_dzd | nombre }}</td>{% endfor %}<td class="ecart">{{ (sc[1].transport_dzd - sc[0].transport_dzd) | ecart(0) }}</td></tr>
+                <tr><td>Douane ({{ n }} × {{ resultat.frais_douane_unitaire | nombre }})</td>{% for x in sc %}<td>{{ x.douane_dzd | nombre }}</td>{% endfor %}<td class="ecart">{{ (sc[1].douane_dzd - sc[0].douane_dzd) | ecart(0) }}</td></tr>
+                <tr class="total"><td>Total</td>{% for x in sc %}<td>{{ x.avec_douane_dzd | nombre }}</td>{% endfor %}<td class="ecart">{{ (sc[1].avec_douane_dzd - sc[0].avec_douane_dzd) | ecart(0) }}</td></tr>
+                <tr class="principal"><td>Une voiture, tout compris</td>{% for x in sc %}<td>{{ x.avec_douane_par_voiture_dzd | nombre }}</td>{% endfor %}<td class="ecart">{{ (sc[1].avec_douane_par_voiture_dzd - sc[0].avec_douane_par_voiture_dzd) | ecart(0) }}</td></tr>
+            </tbody>
+        </table>
         </div>
-        <div class="ligne">
-            <span>Droits de douane</span>
-            <span>{{ resultat.droits_douane }} $</span>
-        </div>
-        <div class="ligne total">
-            <span>Total (USD)</span>
-            <span>{{ resultat.total_usd }} $</span>
-        </div>
-        <div class="ligne total">
-            <span>Total (DZD)</span>
-            <span>{{ resultat.total_dzd }} DZD</span>
+
+        <h2 class="table-title">Sans douane</h2>
+        <div class="table-wrap">
+        <table class="comparatif">
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for x in sc %}<th>{{ x.nom }}<small>1 € = {{ x.taux_eur_usd | nombre(4) }} $</small></th>{% endfor %}<th>Écart<small>faible − bon</small></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="section"><td colspan="4">En dinars (DZD)</td></tr>
+                <tr class="total"><td>Total</td>{% for x in sc %}<td>{{ x.sans_douane_dzd | nombre }}</td>{% endfor %}<td class="ecart">{{ (sc[1].sans_douane_dzd - sc[0].sans_douane_dzd) | ecart(0) }}</td></tr>
+                <tr class="principal"><td>Une voiture</td>{% for x in sc %}<td>{{ x.sans_douane_par_voiture_dzd | nombre }}</td>{% endfor %}<td class="ecart">{{ (sc[1].sans_douane_par_voiture_dzd - sc[0].sans_douane_par_voiture_dzd) | ecart(0) }}</td></tr>
+                <tr class="section"><td colspan="4">En euros (€)</td></tr>
+                <tr class="total"><td>Total</td>{% for x in sc %}<td>{{ x.sans_douane_eur | nombre(2) }} €</td>{% endfor %}<td class="ecart">{{ (sc[1].sans_douane_eur - sc[0].sans_douane_eur) | ecart(2) }} €</td></tr>
+                <tr class="principal"><td>Une voiture</td>{% for x in sc %}<td>{{ x.sans_douane_par_voiture_eur | nombre(2) }} €</td>{% endfor %}<td class="ecart">{{ (sc[1].sans_douane_par_voiture_eur - sc[0].sans_douane_par_voiture_eur) | ecart(2) }} €</td></tr>
+            </tbody>
+        </table>
         </div>
     </div>
     {% endif %}
